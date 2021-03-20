@@ -42,8 +42,10 @@
 #endif
 #include <sys/time.h>
 
-#if defined(__linux__) || defined(_ALLBSD_SOURCE)
+#if defined(__linux__) || defined(MACOSX)
 #include <sys/xattr.h>
+#elif defined(__FreeBSD__) || defined(__NetBSD__)
+#include <sys/extattr.h>
 #endif
 
 #if defined(_AIX)
@@ -1436,21 +1438,23 @@ JNIEXPORT jint JNICALL
 Java_sun_nio_fs_UnixNativeDispatcher_fgetxattr0(JNIEnv* env, jclass clazz,
     jint fd, jlong nameAddress, jlong valueAddress, jint valueLen)
 {
-    size_t res = -1;
+    ssize_t res = -1;
     const char* name = jlong_to_ptr(nameAddress);
     void* value = jlong_to_ptr(valueAddress);
 
 #ifdef __linux__
     res = fgetxattr(fd, name, value, valueLen);
-#elif defined(_ALLBSD_SOURCE)
+#elif defined(MACOSX)
     res = fgetxattr(fd, name, value, valueLen, 0, 0);
+#elif defined(__FreeBSD__) || defined(__NetBSD__)
+    res = extattr_get_fd(fd, EXTATTR_NAMESPACE_USER, name, value, (size_t)valueLen);
 #elif defined(_AIX)
     res = fgetea(fd, name, value, valueLen);
 #else
     throwUnixException(env, ENOTSUP);
 #endif
 
-    if (res == (size_t)-1)
+    if (res == (ssize_t)-1)
         throwUnixException(env, errno);
     return (jint)res;
 }
@@ -1465,8 +1469,10 @@ Java_sun_nio_fs_UnixNativeDispatcher_fsetxattr0(JNIEnv* env, jclass clazz,
 
 #ifdef __linux__
     res = fsetxattr(fd, name, value, valueLen, 0);
-#elif defined(_ALLBSD_SOURCE)
+#elif defined(MACOSX)
     res = fsetxattr(fd, name, value, valueLen, 0, 0);
+#elif defined(__FreeBSD__) || defined(__NetBSD__)
+    res = extattr_set_fd(fd, EXTATTR_NAMESPACE_USER, name, value, (size_t)valueLen);
 #elif defined(_AIX)
     res = fsetea(fd, name, value, valueLen, 0);
 #else
@@ -1486,8 +1492,10 @@ Java_sun_nio_fs_UnixNativeDispatcher_fremovexattr0(JNIEnv* env, jclass clazz,
 
 #ifdef __linux__
     res = fremovexattr(fd, name);
-#elif defined(_ALLBSD_SOURCE)
+#elif defined(MACOSX)
     res = fremovexattr(fd, name, 0);
+#elif defined(__FreeBSD__) || defined(__NetBSD__)
+    res = extattr_delete_fd(fd, EXTATTR_NAMESPACE_USER, name);
 #elif defined(_AIX)
     res = fremoveea(fd, name);
 #else
@@ -1502,20 +1510,22 @@ JNIEXPORT jint JNICALL
 Java_sun_nio_fs_UnixNativeDispatcher_flistxattr(JNIEnv* env, jclass clazz,
     jint fd, jlong listAddress, jint size)
 {
-    size_t res = -1;
+    ssize_t res = -1;
     char* list = jlong_to_ptr(listAddress);
 
 #ifdef __linux__
     res = flistxattr(fd, list, (size_t)size);
-#elif defined(_ALLBSD_SOURCE)
+#elif defined(MACOSX)
     res = flistxattr(fd, list, (size_t)size, 0);
+#elif defined(__FreeBSD__) || defined(__NetBSD__)
+    res = extattr_list_fd(fd, EXTATTR_NAMESPACE_USER, list, (size_t)size);
 #elif defined(_AIX)
     res = flistea(fd, list, (size_t)size);
 #else
     throwUnixException(env, ENOTSUP);
 #endif
 
-    if (res == (size_t)-1)
+    if (res == (ssize_t)-1)
         throwUnixException(env, errno);
     return (jint)res;
 }
