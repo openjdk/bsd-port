@@ -33,8 +33,8 @@
   #define SYMBOL(s) s
 
   #define DECLARE_FUNC(func) \
-    .globl func %% \
-    .hidden func %% \
-    .type func, %function %% \
+    .globl func ; \
+    .hidden func ; \
+    .type func, %function ; \
     func
 #endif
