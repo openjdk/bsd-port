@@ -2,7 +2,7 @@
 project=bsd-port
 repository=bsd-port
 jbs=jdk
-version=26
+version=27
 
 [checks]
 error=author,committer,reviewers,executable,symlink,whitespace

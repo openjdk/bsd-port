@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2025, 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,6 +22,7 @@
  *
  */
 
+#include "cds/aotCompressedPointers.hpp"
 #include "cds/cdsConfig.hpp"
 #include "ci/ciEnv.hpp"
 #include "ci/ciMetadata.hpp"
@@ -83,7 +84,7 @@ static void verify_archived_entry(TrainingData* td, const TrainingData::Key* k) 
 
 void TrainingData::verify() {
   if (TrainingData::have_data() && !TrainingData::assembling_data()) {
-    archived_training_data_dictionary()->iterate([&](TrainingData* td) {
+    archived_training_data_dictionary()->iterate_all([&](TrainingData* td) {
       if (td->is_KlassTrainingData()) {
         KlassTrainingData* ktd = td->as_KlassTrainingData();
         if (ktd->has_holder() && ktd->holder()->is_loaded()) {
@@ -466,7 +467,7 @@ void TrainingData::init_dumptime_table(TRAPS) {
   precond((!assembling_data() && !need_data()) || need_data() != assembling_data());
   if (assembling_data()) {
     _dumptime_training_data_dictionary = new DumptimeTrainingDataDictionary();
-    _archived_training_data_dictionary.iterate([&](TrainingData* record) {
+    _archived_training_data_dictionary.iterate_all([&](TrainingData* record) {
       _dumptime_training_data_dictionary->append(record);
     });
   }
@@ -512,8 +513,7 @@ void TrainingData::dump_training_data() {
 #endif // ASSERT
       td = ArchiveBuilder::current()->get_buffered_addr(td);
       uint hash = TrainingData::Key::cds_hash(td->key());
-      u4 delta = ArchiveBuilder::current()->buffer_to_offset_u4((address)td);
-      writer.add(hash, delta);
+      writer.add(hash, AOTCompressedPointers::encode_not_null(td));
     }
     writer.dump(&_archived_training_data_dictionary_for_dumping, "training data dictionary");
   }
@@ -692,7 +692,7 @@ void TrainingData::print_archived_training_data_on(outputStream* st) {
   st->print_cr("Archived TrainingData Dictionary");
   TrainingDataPrinter tdp(st);
   TrainingDataLocker::initialize();
-  _archived_training_data_dictionary.iterate(&tdp);
+  _archived_training_data_dictionary.iterate_all(&tdp);
 }
 
 void TrainingData::Key::metaspace_pointers_do(MetaspaceClosure *iter) {

@@ -198,13 +198,6 @@
           constraint(MarkStackSizeConstraintFunc,AfterErgo)                 \
           range(1, (INT_MAX - 1))                                           \
                                                                             \
-  product(bool, ParallelRefProcEnabled, false,                              \
-          "(Deprecated) Enable parallel reference processing "              \
-          "whenever possible")                                              \
-                                                                            \
-  product(bool, ParallelRefProcBalancingEnabled, true,                      \
-          "(Deprecated) Enable balancing of reference processing queues")   \
-                                                                            \
   product(size_t, ReferencesPerThread, 1000, EXPERIMENTAL,                  \
                "Ergonomically start one thread for this amount of "         \
                "references for reference processing if "                    \
@@ -261,24 +254,21 @@
   develop(uintx, ObjArrayMarkingStride, 2048,                               \
           "Number of object array elements to push onto the marking stack " \
           "before pushing a continuation entry")                            \
+          range(1, INT_MAX/2)                                               \
                                                                             \
   product_pd(bool, NeverActAsServerClassMachine,                            \
-          "Never act like a server-class machine")                          \
+          "(Deprecated) Never act like a server-class machine")             \
                                                                             \
   product(bool, AlwaysActAsServerClassMachine, false,                       \
-          "Always act like a server-class machine")                         \
-                                                                            \
-  product(uint64_t, MaxRAM, 0,                                              \
-          "(Deprecated) Real memory size (in bytes) used to set maximum "   \
-          "heap size")                                                     \
-          range(0, 0XFFFFFFFFFFFFFFFF)                                      \
+          "(Deprecated) Always act like a server-class machine")            \
                                                                             \
   product(bool, AggressiveHeap, false,                                      \
-          "Optimize heap options for long-running memory intensive apps")   \
+          "(Deprecated) Optimize heap options for long-running memory "     \
+          "intensive apps")                                                 \
                                                                             \
   product(size_t, ErgoHeapSizeLimit, 0,                                     \
           "Maximum ergonomically set heap size (in bytes); zero means use " \
-          "MaxRAM * MaxRAMPercentage / 100")                                \
+          "(System RAM) * MaxRAMPercentage / 100")                          \
           range(0, max_uintx)                                               \
                                                                             \
   product(double, MaxRAMPercentage, 25.0,                                   \
@@ -290,7 +280,7 @@
           "size on systems with small physical memory size")                \
           range(0.0, 100.0)                                                 \
                                                                             \
-  product(double, InitialRAMPercentage, 0.2,                                \
+  product(double, InitialRAMPercentage, 0.0,                                \
           "Percentage of real memory used for initial heap size")           \
           range(0.0, 100.0)                                                 \
                                                                             \
