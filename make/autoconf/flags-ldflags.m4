@@ -111,6 +111,10 @@ AC_DEFUN([FLAGS_SETUP_LDFLAGS_HELPER],
     OS_LDFLAGS="-mmacosx-version-min=$MACOSX_VERSION_MIN -Wl,-reproducible"
   fi
 
+  if test "x$OPENJDK_TARGET_OS_ENV" = xbsd.openbsd; then
+    OS_LDFLAGS="-Wl,-z,wxneeded -Wl,-z,nobtcfi"
+  fi
+
   # Setup debug level-dependent LDFLAGS
   if test "x$TOOLCHAIN_TYPE" = xgcc; then
     if test "x$OPENJDK_TARGET_OS" = xlinux; then
