@@ -75,7 +75,8 @@ AC_DEFUN_ONCE([LIB_DETERMINE_DEPENDENCIES],
   fi
 
   # Check if alsa is needed
-  if test "x$OPENJDK_TARGET_OS" = xlinux || test "x$OPENJDK_TARGET_OS_ENV" = xbsd.freebsd || test "x$OPENJDK_TARGET_OS_ENV" = xbsd.netbsd; then
+  if test "x$OPENJDK_TARGET_OS" = xlinux || test "x$OPENJDK_TARGET_OS_ENV" = xbsd.freebsd \
+      || test "x$OPENJDK_TARGET_OS_ENV" = xbsd.netbsd; then
     NEEDS_LIB_ALSA=true
   else
     NEEDS_LIB_ALSA=false
@@ -132,7 +133,8 @@ AC_DEFUN_ONCE([LIB_SETUP_LIBRARIES],
   fi
 
   # Threading library
-  if test "x$OPENJDK_TARGET_OS" = xlinux || test "x$OPENJDK_TARGET_OS" = xaix || test "x$OPENJDK_TARGET_OS" = xbsd; then
+  if test "x$OPENJDK_TARGET_OS" = xlinux || test "x$OPENJDK_TARGET_OS" = xaix \
+      || test "x$OPENJDK_TARGET_OS" = xbsd; then
     BASIC_JVM_LIBS="$BASIC_JVM_LIBS $LIBPTHREAD"
   fi
 

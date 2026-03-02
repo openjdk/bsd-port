@@ -493,7 +493,8 @@ AC_DEFUN([PLATFORM_SETUP_LEGACY_VARS_HELPER],
 
   # Setup OPENJDK_$1_CPU_OSARCH, which is used to set the os.arch Java system property
   OPENJDK_$1_CPU_OSARCH="$OPENJDK_$1_CPU"
-  if test "x$OPENJDK_$1_OS" = xbsd -o "x$OPENJDK_$1_OS" = xlinux && test "x$OPENJDK_$1_CPU" = xx86; then
+  if test "x$OPENJDK_$1_OS" = xbsd -o "x$OPENJDK_$1_OS" = xlinux \
+      && test "x$OPENJDK_$1_CPU" = xx86; then
     # On linux and BSD only, we replace x86 with i386.
     OPENJDK_$1_CPU_OSARCH="i386"
   elif test "x$OPENJDK_$1_OS" != xmacosx && test "x$OPENJDK_$1_CPU" = xx86_64; then
