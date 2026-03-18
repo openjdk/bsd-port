@@ -55,7 +55,7 @@ mkdir -p "$SRC_DIR/$BUILD_DIR"
 cd "$SRC_DIR/$BUILD_DIR"
 
 case $OS_NAME in
-  Linux|Darwin)
+  Linux|Darwin|*BSD)
     echo "Building Tidy HTML5 for Unix-like platform ($OS_NAME)..."
 
     CMAKE_ARCH_OPTIONS=""

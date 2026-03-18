@@ -62,6 +62,8 @@ ifeq ($(HSDIS_BACKEND), llvm)
     LLVM_OS := apple-darwin
   else ifeq ($(call isTargetOs, windows), true)
     LLVM_OS := pc-windows-msvc
+  else ifeq ($(call isTargetOsEnv, bsd.freebsd), true)
+    LLVM_OS := unknown-freebsd
   else
     $(error No support for LLVM on this platform)
   endif

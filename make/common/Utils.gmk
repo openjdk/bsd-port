@@ -196,6 +196,9 @@ isTargetOs = \
 isTargetOsType = \
   $(strip $(if $(filter $(OPENJDK_TARGET_OS_TYPE), $1), true, false))
 
+isTargetOsEnv = \
+  $(strip $(if $(filter $(OPENJDK_TARGET_OS_ENV), $1), true, false))
+
 isTargetCpu = \
   $(strip $(if $(filter $(OPENJDK_TARGET_CPU), $1), true, false))
 

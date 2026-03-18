@@ -77,6 +77,7 @@ ifeq ($(call isTargetOs, linux), true)
       OPTIMIZATION := LOW, \
       EXTRA_HEADER_DIRS := libjli, \
       CFLAGS_linux := -fPIC, \
+      CFLAGS_bsd := -fPIC, \
       LD_SET_ORIGIN := false, \
       OUTPUT_DIR := $(SUPPORT_OUTPUTDIR)/modules_libs/$(MODULE), \
   ))

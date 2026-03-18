@@ -57,7 +57,7 @@ HOTSPOT_JTREG_EXECUTABLES_JDK_LIBS_exedaemonDestroy := java.base:libjvm
 ################################################################################
 # Platform specific setup
 
-ifeq ($(call isTargetOs, linux), true)
+ifeq ($(call isTargetOs, linux bsd), true)
   HOTSPOT_JTREG_LIBRARIES_CFLAGS_libNoFramePointer := -fomit-frame-pointer
   HOTSPOT_JTREG_LIBRARIES_LDFLAGS_libtest-rw := -z noexecstack
   HOTSPOT_JTREG_LIBRARIES_LDFLAGS_libtest-rwx := -z execstack
@@ -65,9 +65,9 @@ ifeq ($(call isTargetOs, linux), true)
   HOTSPOT_JTREG_EXECUTABLES_JDK_LIBS_exestack-gap := java.base:libjvm
   HOTSPOT_JTREG_EXECUTABLES_JDK_LIBS_exestack-tls := java.base:libjvm
   TEST_exeinvoke_exeinvoke.c_OPTIMIZATION := NONE
-  HOTSPOT_JTREG_EXECUTABLES_LIBS_exeFPRegs := -ldl
-  HOTSPOT_JTREG_LIBRARIES_LIBS_libatExit += -ldl
-  HOTSPOT_JTREG_LIBRARIES_LIBS_libAsyncGetCallTraceTest := -ldl
+  HOTSPOT_JTREG_EXECUTABLES_LIBS_exeFPRegs := $(LIBDL)
+  HOTSPOT_JTREG_LIBRARIES_LIBS_libatExit += $(LIBDL)
+  HOTSPOT_JTREG_LIBRARIES_LIBS_libAsyncGetCallTraceTest := $(LIBDL)
   HOTSPOT_JTREG_LIBRARIES_LDFLAGS_libfast-math := -ffast-math
 else
   HOTSPOT_JTREG_EXCLUDE += libtest-rw.c libtest-rwx.c \
