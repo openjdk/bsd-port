@@ -28,10 +28,7 @@
 include LibCommon.gmk
 
 SCTP_SUPPORTED=
-ifeq ($(call isTargetOs, linux), true)
-  SCTP_SUPPORTED=true
-endif
-ifeq ($(OPENJDK_TARGET_OS_ENV), bsd.freebsd)
+ifeq ($(call Or $(call isTargetOs, linux) $(call isTargetOsEnv, bsd.freebsd)), true)
   SCTP_SUPPORTED=true
 endif
 

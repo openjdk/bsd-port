@@ -214,8 +214,8 @@ define CreateDynamicLibraryOrExecutable
 	            $$($1_OBJCOPY) --add-gnu-debuglink=$$($1_DEBUGINFO_FILES) $$($1_TARGET))
           endif
         endif
-        ifeq ($(OPENJDK_TARGET_OS_ENV), bsd.netbsd)
-          /usr/sbin/paxctl +m $$@
+        ifeq ($(call isTargetOsEnv, bsd.netbsd), true)
+          $(PAXCTL) +m $$@
         endif
         ifneq ($(MACOSX_CODESIGN_MODE), disabled)
           # Remove signature explicitly first to avoid warnings if the linker

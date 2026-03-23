@@ -96,6 +96,12 @@ AC_DEFUN_ONCE([BASIC_SETUP_TOOLS],
   UTIL_REQUIRE_PROGS(TOUCH, touch)
   UTIL_REQUIRE_PROGS(XARGS, xargs)
 
+  if test "x$OPENJDK_BUILD_OS_ENV" = "bsd.netbsd"; then
+    # Required by NetBSD to adjust privilege protections for
+    # mapped memory pages
+    UTIL_REQUIRE_PROGS(PAXCTL, paxctl)
+  fi
+
   # Required tools with some special treatment
   UTIL_REQUIRE_SPECIAL(FGREP, [AC_PROG_FGREP])
 
