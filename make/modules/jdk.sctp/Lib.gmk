@@ -28,7 +28,7 @@
 include LibCommon.gmk
 
 SCTP_SUPPORTED=
-ifeq ($(call Or $(call isTargetOs, linux) $(call isTargetOsEnv, bsd.freebsd)), true)
+ifeq ($(call Or, $(call isTargetOs, linux) $(call isTargetOsEnv, bsd.freebsd)), true)
   SCTP_SUPPORTED=true
 endif
 
