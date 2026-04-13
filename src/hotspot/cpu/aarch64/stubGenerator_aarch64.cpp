@@ -10261,7 +10261,7 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
-#if defined (LINUX) && !defined (__ARM_FEATURE_ATOMICS)
+#if (defined (LINUX) || defined (_BSDONLY_SOURCE)) && !defined (__ARM_FEATURE_ATOMICS)
 
   // ARMv8.1 LSE versions of the atomic stubs used by AtomicAccess::PlatformXX.
   //
@@ -10457,7 +10457,7 @@ class StubGenerator: public StubCodeGenerator {
 
     ICache::invalidate_range(first_entry, __ pc() - first_entry);
   }
-#endif // LINUX
+#endif // LINUX || _BSDONLY_SOURCE
 
   address generate_cont_thaw(Continuation::thaw_kind kind) {
     bool return_barrier = Continuation::is_thaw_return_barrier(kind);
@@ -11727,11 +11727,11 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_upcall_stub_exception_handler = generate_upcall_stub_exception_handler();
     StubRoutines::_upcall_stub_load_target = generate_upcall_stub_load_target();
 
-#if defined (LINUX) && !defined (__ARM_FEATURE_ATOMICS)
+#if (defined (LINUX) || defined (_BSDONLY_SOURCE)) && !defined (__ARM_FEATURE_ATOMICS)
 
     generate_atomic_entry_points();
 
-#endif // LINUX
+#endif // LINUX || _BSDONLY_SOURCE
 
 #ifdef COMPILER2
     if (UseSecondarySupersTable) {
@@ -11927,7 +11927,7 @@ void StubGenerator_generate(CodeBuffer* code, BlobId blob_id) {
 }
 
 
-#if defined (LINUX)
+#if defined(LINUX) || defined(_BSDONLY_SOURCE)
 
 // Define pointers to atomic stubs and initialize them to point to the
 // code in atomic_aarch64.S.
@@ -11957,4 +11957,4 @@ DEFAULT_ATOMIC_OP(cmpxchg, 8, _seq_cst)
 
 #undef DEFAULT_ATOMIC_OP
 
-#endif // LINUX
+#endif // LINUX || _BSDONLY_SOURCE

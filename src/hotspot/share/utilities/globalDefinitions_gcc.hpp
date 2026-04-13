@@ -33,7 +33,9 @@
 
 #include "cppstdlib/cstdlib.hpp"
 
+#ifndef _BSDONLY_SOURCE
 #include <alloca.h>
+#endif
 #include <ctype.h>
 #include <dlfcn.h>
 #include <errno.h>

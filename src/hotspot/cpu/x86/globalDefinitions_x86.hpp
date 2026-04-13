@@ -46,7 +46,7 @@ const bool CCallingConventionRequiresIntsAsLongs = false;
 // hardware. If not, DEFAULT_CACHE_LINE_SIZE might as well suffice.
 #define DEFAULT_PADDING_SIZE (DEFAULT_CACHE_LINE_SIZE*2)
 
-#if defined(LINUX) || defined(__APPLE__)
+#if defined(LINUX) || defined(_ALLBSD_SOURCE)
 #define SUPPORT_RESERVED_STACK_AREA
 #endif
 
