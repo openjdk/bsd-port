@@ -442,8 +442,8 @@ static int util_posix_fallocate(int fd, off_t offset, off_t len) {
   if (fstat(fd, &s) == -1)
     return -1;
 
-  if (s.st_size < offset+len) {
-    return ftruncate(fd, offset+len);
+  if (s.st_size < offset + len) {
+    return ftruncate(fd, offset + len);
   }
   return 0;
 #else

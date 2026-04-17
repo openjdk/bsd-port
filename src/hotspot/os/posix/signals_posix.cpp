@@ -809,10 +809,11 @@ static bool check_signal_handler(int sig) {
   if (os_sigaction == nullptr) {
     // only trust the default sigaction, in case it has been interposed
 #if defined(__NetBSD__)
-    os_sigaction = (os_sigaction_t)dlsym(RTLD_DEFAULT, "__sigaction14");
+  #define SIGACTION_NAME "__sigaction14"
 #else
-    os_sigaction = (os_sigaction_t)dlsym(RTLD_DEFAULT, "sigaction");
+  #define SIGACTION_NAME "sigaction"
 #endif
+    os_sigaction = (os_sigaction_t)dlsym(RTLD_DEFAULT, SIGACTION_NAME);
     if (os_sigaction == nullptr) return false;
   }
 
