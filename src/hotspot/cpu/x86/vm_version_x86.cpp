@@ -48,7 +48,7 @@ int VM_Version::_stepping;
 bool VM_Version::_has_intel_jcc_erratum;
 VM_Version::CpuidInfo VM_Version::_cpuid_info = { 0, };
 
-#define DECLARE_CPU_FEATURE_NAME(id, name, bit) XSTR(name),
+#define DECLARE_CPU_FEATURE_NAME(id, name) XSTR(name),
 const char* VM_Version::_features_names[] = { CPU_FEATURE_FLAGS(DECLARE_CPU_FEATURE_NAME)};
 #undef DECLARE_CPU_FEATURE_NAME
 
@@ -3330,12 +3330,12 @@ int VM_Version::cpu_features_size() {
 }
 
 void VM_Version::store_cpu_features(void* buf) {
-  VM_Features copy = _features;
-  copy.clear_feature(CPU_HT); // HT does not result in incompatibility of aot code cache
+  VM_Features copy = _features.aot_code_cache_features();
   memcpy(buf, &copy, sizeof(VM_Features));
 }
 
-bool VM_Version::supports_features(void* features_buffer) {
+bool VM_Version::verify_aot_code_cache_features(void* features_buffer) {
   VM_Features* features_to_test = (VM_Features*)features_buffer;
-  return _features.supports_features(features_to_test);
+  VM_Features rt_features = _features.aot_code_cache_features();
+  return rt_features.verify_aot_code_cache_features(features_to_test);
 }
