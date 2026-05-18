@@ -175,6 +175,10 @@ void BarrierSetNMethod::arm_all_nmethods() {
 }
 
 int BarrierSetNMethod::nmethod_stub_entry_barrier(address* return_address_ptr) {
+  // Enable WXWrite: the function is called directly from nmethod_entry_barrier
+  // stub.
+  BSD_AARCH64_ONLY(ThreadWXEnable wx(WXWrite, Thread::current()));
+
   address return_address = *return_address_ptr;
   AARCH64_PORT_ONLY(return_address = pauth_strip_pointer(return_address));
   CodeBlob* cb = CodeCache::find_blob(return_address);

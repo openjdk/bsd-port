@@ -249,7 +249,7 @@ static JRT_LEAF(intptr_t*, thaw(JavaThread* thread, int kind))
   DEBUG_ONLY(PauseNoSafepointVerifier pnsv(&__nsv);)
 
   // we might modify the code cache via BarrierSetNMethod::nmethod_entry_barrier
-  MACOS_AARCH64_ONLY(ThreadWXEnable __wx(WXWrite, thread));
+  BSD_AARCH64_ONLY(ThreadWXEnable __wx(WXWrite, thread));
   return ConfigT::thaw(thread, (Continuation::thaw_kind)kind);
 JRT_END
 
