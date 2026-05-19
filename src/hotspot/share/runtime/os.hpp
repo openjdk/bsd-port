@@ -140,7 +140,7 @@ enum ThreadPriority {        // JLS 20.20.1-3
   CriticalPriority = 11      // Critical thread priority
 };
 
-#if BSD_AARCH64
+#ifdef BSD_AARCH64
 enum WXMode {
   WXWrite = 0,
   WXExec = 1,
