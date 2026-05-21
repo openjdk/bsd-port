@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020, 2026, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2026, Oracle and/or its affiliates. All rights reserved.
 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 #
 # This code is free software; you can redistribute it and/or modify it
@@ -25,9 +25,18 @@
 
 ################################################################################
 
-DISABLED_WARNINGS_java += dangling-doc-comments this-escape
+include CopyCommon.gmk
 
-DOCLINT += -Xdoclint:all/protected \
-    '-Xdoclint/package:java.*,javax.*'
+# the autocompletion script is Bash-only
+ifneq ($(call isTargetOsType, windows), true)
+  JCMD_CONF_DIR := $(TOPDIR)/src/jdk.jcmd/share/conf
+  $(eval $(call SetupCopyFiles, COPY_JCMD_BASH_COMPLETION, \
+      DEST := $(CONF_DST_DIR)/bash-completion, \
+      SRC := $(JCMD_CONF_DIR)/bash-completion, \
+      FILES := jcmd, \
+  ))
+endif
+
+TARGETS += $(COPY_JCMD_BASH_COMPLETION)
 
 ################################################################################
