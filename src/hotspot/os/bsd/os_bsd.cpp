@@ -76,7 +76,6 @@
 # include <fcntl.h>
 # include <fenv.h>
 # include <inttypes.h>
-# include <mach/mach.h>
 # include <poll.h>
 # include <pthread.h>
 # include <pwd.h>
@@ -112,6 +111,7 @@
 
 #ifdef __APPLE__
   #include <libproc.h>
+  #include <mach/mach.h>
   #include <mach/task_info.h>
   #include <mach-o/dyld.h>
 
