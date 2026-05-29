@@ -83,6 +83,68 @@ public:
 
   static bool test(address p);
 };
+#elif defined(_BSDONLY_SOURCE) && defined(AARCH64)
+
+//
+// Per https://cr.openjdk.org/~jrose/jvm/hotspot-cmc.html, HotSpot
+// will cross-modify code.
+//
+// To workaround the potential subtle race issues outlined in the
+// paper linked to above, HotSpot calls pthread_jit_write_protect_np()
+// on Darwin/aarch64.  On other OSes, different workarounds are applied,
+// but some of these appear Cortex specific and are not sufficient on
+// NetBSD and FreeBSD when running on Apple Silicon (see
+// https://mail-index.netbsd.org/tech-pkg/2025/07/12/msg031385.html and
+// https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=265284).
+//
+// Using pthread_jit_write_protect_np() will temporarily write-protect
+// every executable page in the process space for the calling thread,
+// so that the thread can execute code in pages that are otherwise
+// writable.  The important part, from our perspective, is that the
+// function happens to issue data and instruction memory barriers
+// (i.e. DSB and ISB).  These are enough to address the issues on
+// NetBSD and FreeBSD.
+//
+// To that end, issue these memory barriers every time Darwin would
+// call pthread_jit_write_protect_np().  This is implemented below and
+// by the calls to BSD_AARCH64_ONLY(ThreadWXEnable wx(WXWrite, <thread>)
+// throughout the code (formerly MACOS_AARCH64_ONLY).
+//
+// Notes:
+// 1. This has a negative performance impact on Cortex chips, but we'll
+//    accept that in favour of correctness overall
+// 2. OpenBSD doesn't seem to be impacted by this, although it is not
+//    clear why that is
+//
+
+class ThreadWXEnable  {
+  WXMode _new_mode;
+public:
+  ThreadWXEnable(WXMode * new_mode, Thread*) :
+    _new_mode(*new_mode)
+  {
+    if (_new_mode == WXExec) {
+      // We are going to execute some code that has been potentially
+      // modified.
+      __asm__ __volatile__ ("dsb\tsy\n"
+                            "isb\tsy" : : : "memory");
+    }
+  }
+
+  ThreadWXEnable(WXMode new_mode, Thread * t)
+  {
+    ThreadWXEnable(&new_mode, t);
+  }
+
+  ~ThreadWXEnable() {
+    if (_new_mode == WXWrite) {
+      // We may have modified some code that is going to be executed
+      // outside of this block.
+      __asm__ __volatile__ ("dsb\tsy\n"
+                            "isb\tsy" : : : "memory");
+    }
+  }
+};
 #endif // MACOS_AARCH64
 
 #endif // SHARE_RUNTIME_THREADWXSETTERS_INLINE_HPP
