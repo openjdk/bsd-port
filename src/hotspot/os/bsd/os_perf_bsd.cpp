@@ -33,16 +33,18 @@
   #include <mach/mach.h>
   #include <mach/task_info.h>
 #else
-# if !defined(__NetBSD__)
+# if defined(__NetBSD__)
+  #include <uvm/uvm_extern.h>
+  #if !defined(KERN_PROC_PATHNAME)
+  #  define KERN_PROC_PATHNAME 5
+  #endif
+# else
   #include <sys/user.h>
 # endif
   #include <sys/sched.h>
   #include <sys/resource.h>
   #define NET_RT_IFLIST2 NET_RT_IFLIST
   #define RTM_IFINFO2    RTM_IFINFO
-#endif
-#ifdef __NetBSD__
-  #include <uvm/uvm_extern.h>
 #endif
 #include <sys/time.h>
 #include <sys/sysctl.h>
@@ -52,7 +54,7 @@
 #include <net/route.h>
 #include <sys/times.h>
 
-static const time_t NANOS_PER_SEC = 1000000000LL;
+static const double NANOS_PER_SEC = 1000000000.0;
 static const time_t MICROS_PER_SEC = 1000000LL;
 
 class CPUPerformanceInterface::CPUPerformance : public CHeapObj<mtInternal> {
@@ -99,7 +101,7 @@ class CPUPerformanceInterface::CPUPerformance : public CHeapObj<mtInternal> {
     if (status != 0) {
       return false;
     }
-    *resultp = tp.tv_sec * NANOS_PER_SEC + tp.tv_nsec;
+    *resultp = tp.tv_sec * (uint64_t)NANOS_PER_SEC + tp.tv_nsec;
     return true;
   }
   double normalize(double value) {
@@ -531,7 +533,7 @@ int CPUPerformanceInterface::CPUPerformance::context_switch_rate(double* rate) {
   if(!now_in_nanos(&total_csr_nanos)) {
     return OS_ERR;
   }
-  double delta_in_sec = (double)(total_csr_nanos - _total_csr_nanos) / (double)NANOS_PER_SEC;
+  double delta_in_sec = (double)(total_csr_nanos - _total_csr_nanos) / NANOS_PER_SEC;
   if (delta_in_sec == 0.0) {
     // Avoid division by zero
     return OS_ERR;
@@ -850,9 +852,6 @@ int SystemProcessInterface::SystemProcesses::system_processes(SystemProcess** sy
 
   for (int i = 0; i < pid_count; i++) {
     // Executable path
-#if !defined(KERN_PROC_PATHNAME)
-#define KERN_PROC_PATHNAME 5
-#endif
     int pmib[] = { CTL_KERN, KERN_PROC_ARGS, lproc[i].p_pid, KERN_PROC_PATHNAME };
     const u_int pmiblen = sizeof(pmib) / sizeof(pmib[0]);
     char pbuf[PATH_MAX];
