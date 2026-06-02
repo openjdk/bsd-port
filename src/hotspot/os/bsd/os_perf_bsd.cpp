@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2012, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2026, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, The FreeBSD Foundation
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,6 +22,8 @@
  * questions.
  *
  */
+
+#include "os_perf_bsd.hpp"
 #include "memory/allocation.inline.hpp"
 #include "memory/resourceArea.hpp"
 #include "runtime/os.hpp"
@@ -28,23 +31,15 @@
 #include "runtime/vm_version.hpp"
 #include "utilities/globalDefinitions.hpp"
 
-#ifdef __APPLE__
-  #import <libproc.h>
-  #include <mach/mach.h>
-  #include <mach/task_info.h>
-#else
-# if defined(__NetBSD__)
+#include <sys/sched.h>
+#include <sys/resource.h>
+#define NET_RT_IFLIST2 NET_RT_IFLIST
+#define RTM_IFINFO2    RTM_IFINFO
+
+#ifdef __NetBSD__
   #include <uvm/uvm_extern.h>
-  #if !defined(KERN_PROC_PATHNAME)
-  #  define KERN_PROC_PATHNAME 5
-  #endif
-# else
+#else
   #include <sys/user.h>
-# endif
-  #include <sys/sched.h>
-  #include <sys/resource.h>
-  #define NET_RT_IFLIST2 NET_RT_IFLIST
-  #define RTM_IFINFO2    RTM_IFINFO
 #endif
 #include <sys/time.h>
 #include <sys/sysctl.h>
@@ -53,171 +48,6 @@
 #include <net/if_dl.h>
 #include <net/route.h>
 #include <sys/times.h>
-
-static const double NANOS_PER_SEC = 1000000000.0;
-static const time_t MICROS_PER_SEC = 1000000LL;
-
-class CPUPerformanceInterface::CPUPerformance : public CHeapObj<mtInternal> {
-   friend class CPUPerformanceInterface;
- private:
-#ifdef __APPLE__
-  uint64_t _jvm_real;
-  uint64_t _total_csr_nanos;
-  uint64_t _jvm_user;
-  uint64_t _jvm_system;
-  long _jvm_context_switches;
-  long _used_ticks;
-  long _total_ticks;
-  int  _active_processor_count;
-#else
-  struct CPUTicks {
-    uint64_t usedTicks;
-    uint64_t totalTicks;
-  };
-
-  struct JVMTicks {
-    uint64_t userTicks;
-    uint64_t systemTicks;
-    CPUTicks cpuTicks;
-  };
-
-  int _num_procs;
-  int _stathz;          // statistics clock frequency
-  JVMTicks _jvm_ticks;
-  CPUTicks* _cpus;
-  long _total_csr_nanos;
-  long _jvm_context_switches;
-
-  int init_stathz(void);
-  uint64_t tvtoticks(struct timeval tv);
-  int get_cpu_ticks(CPUTicks *ticks, int which_logical_cpu);
-  int get_jvm_ticks(JVMTicks *jvm_ticks);
-#endif
-
-  bool now_in_nanos(uint64_t* resultp) {
-    struct timespec tp;
-    int status = clock_gettime(CLOCK_REALTIME, &tp);
-    assert(status == 0, "clock_gettime error: %s", os::strerror(errno));
-    if (status != 0) {
-      return false;
-    }
-    *resultp = tp.tv_sec * (uint64_t)NANOS_PER_SEC + tp.tv_nsec;
-    return true;
-  }
-  double normalize(double value) {
-    return MIN2<double>(MAX2<double>(value, 0.0), 1.0);
-  }
-
-  int cpu_load(int which_logical_cpu, double* cpu_load);
-  int context_switch_rate(double* rate);
-  int cpu_load_total_process(double* cpu_load);
-  int cpu_loads_process(double* pjvmUserLoad, double* pjvmKernelLoad, double* psystemTotalLoad);
-
-  NONCOPYABLE(CPUPerformance);
-
- public:
-  CPUPerformance();
-  bool initialize();
-  ~CPUPerformance();
-};
-
-#if defined(__APPLE__)
-
-CPUPerformanceInterface::CPUPerformance::CPUPerformance() {
-  _jvm_real = 0;
-  _total_csr_nanos= 0;
-  _jvm_context_switches = 0;
-  _jvm_user = 0;
-  _jvm_system = 0;
-  _used_ticks = 0;
-  _total_ticks = 0;
-  _active_processor_count = 0;
-}
-
-bool CPUPerformanceInterface::CPUPerformance::initialize() {
-  return true;
-}
-
-CPUPerformanceInterface::CPUPerformance::~CPUPerformance() {
-}
-
-int CPUPerformanceInterface::CPUPerformance::cpu_load(int which_logical_cpu, double* cpu_load) {
-  return FUNCTIONALITY_NOT_IMPLEMENTED;
-}
-
-int CPUPerformanceInterface::CPUPerformance::cpu_load_total_process(double* cpu_load) {
-  host_name_port_t host = mach_host_self();
-  host_flavor_t flavor = HOST_CPU_LOAD_INFO;
-  mach_msg_type_number_t host_info_count = HOST_CPU_LOAD_INFO_COUNT;
-  host_cpu_load_info_data_t cpu_load_info;
-
-  kern_return_t kr = host_statistics(host, flavor, (host_info_t)&cpu_load_info, &host_info_count);
-  if (kr != KERN_SUCCESS) {
-    return OS_ERR;
-  }
-
-  long used_ticks  = cpu_load_info.cpu_ticks[CPU_STATE_USER] + cpu_load_info.cpu_ticks[CPU_STATE_NICE] + cpu_load_info.cpu_ticks[CPU_STATE_SYSTEM];
-  long total_ticks = used_ticks + cpu_load_info.cpu_ticks[CPU_STATE_IDLE];
-
-  if (_used_ticks == 0 || _total_ticks == 0) {
-    // First call, just set the values
-    _used_ticks  = used_ticks;
-    _total_ticks = total_ticks;
-    return OS_ERR;
-  }
-
-  long used_delta  = used_ticks - _used_ticks;
-  long total_delta = total_ticks - _total_ticks;
-
-  _used_ticks  = used_ticks;
-  _total_ticks = total_ticks;
-
-  if (total_delta == 0) {
-    // Avoid division by zero
-    return OS_ERR;
-  }
-
-  *cpu_load = (double)used_delta / total_delta;
-
-  return OS_OK;
-}
-
-int CPUPerformanceInterface::CPUPerformance::cpu_loads_process(double* pjvmUserLoad, double* pjvmKernelLoad, double* psystemTotalLoad) {
-  int result = cpu_load_total_process(psystemTotalLoad);
-
-  struct tms buf;
-  clock_t jvm_real = times(&buf);
-  if (jvm_real == (clock_t) (-1)) {
-    return OS_ERR;
-  }
-
-  int active_processor_count = os::active_processor_count();
-  uint64_t jvm_user = buf.tms_utime;
-  uint64_t jvm_system = buf.tms_stime;
-
-  if (active_processor_count != _active_processor_count) {
-    // Change in active processor count
-    result = OS_ERR;
-  } else {
-    uint64_t delta = active_processor_count * (jvm_real - _jvm_real);
-    if (delta == 0) {
-      // Avoid division by zero
-      return OS_ERR;
-    }
-
-    *pjvmUserLoad = normalize((double)(jvm_user - _jvm_user) / delta);
-    *pjvmKernelLoad = normalize((double)(jvm_system - _jvm_system) / delta);
-  }
-
-  _active_processor_count = active_processor_count;
-  _jvm_real = jvm_real;
-  _jvm_user = jvm_user;
-  _jvm_system = jvm_system;
-
-  return result;
-}
-
-#else // !APPLE
 
 CPUPerformanceInterface::CPUPerformance::CPUPerformance() {
   _num_procs = 0;
@@ -486,33 +316,21 @@ int CPUPerformanceInterface::CPUPerformance::cpu_loads_process(double* pjvmUserL
   return OS_OK;
 }
 
-#endif
-
 int CPUPerformanceInterface::CPUPerformance::context_switch_rate(double* rate) {
-#ifdef __APPLE__
-  mach_port_t task = mach_task_self();
-  mach_msg_type_number_t task_info_count = TASK_INFO_MAX;
-  task_info_data_t task_info_data;
-  kern_return_t kr = task_info(task, TASK_EVENTS_INFO, (task_info_t)task_info_data, &task_info_count);
-  if (kr != KERN_SUCCESS) {
-    return OS_ERR;
-  }
-
-  long jvm_context_switches = ((task_events_info_t)task_info_data)->csw;
-#elif defined(__FreeBSD__)
+#if defined(__FreeBSD__)
   unsigned int jvm_context_switches = 0;
   size_t length = sizeof(jvm_context_switches);
   if (sysctlbyname("vm.stats.sys.v_swtch", &jvm_context_switches, &length, nullptr, 0) == -1) {
     return OS_ERR;
   }
-#elif defined(__OpenBSD__) || defined(__NetBSD__)
-#if defined(__OpenBSD__)
+#else
+# if defined(__OpenBSD__)
   struct uvmexp js;
   int mib[] = { CTL_VM, VM_UVMEXP };
-#else
+# elif defined(__NetBSD__)
   struct uvmexp_sysctl js;
   int mib[] = { CTL_VM, VM_UVMEXP2 };
-#endif
+# endif
   size_t jslength = sizeof(js);
   const u_int miblen = sizeof(mib) / sizeof(mib[0]);
   unsigned int jvm_context_switches = 0;
@@ -521,7 +339,8 @@ int CPUPerformanceInterface::CPUPerformance::context_switch_rate(double* rate) {
   }
 
   jvm_context_switches = (unsigned int)js.swtch;
-#endif
+
+#endif // __FreeBSD__
 
   int result = OS_OK;
   if (_total_csr_nanos == 0 || _jvm_context_switches == 0) {
@@ -547,510 +366,105 @@ int CPUPerformanceInterface::CPUPerformance::context_switch_rate(double* rate) {
   return result;
 }
 
-CPUPerformanceInterface::CPUPerformanceInterface() {
-  _impl = nullptr;
-}
-
-bool CPUPerformanceInterface::initialize() {
-  _impl = new CPUPerformanceInterface::CPUPerformance();
-  return _impl->initialize();
-}
-
-CPUPerformanceInterface::~CPUPerformanceInterface() {
-  if (_impl != nullptr) {
-    delete _impl;
-  }
-}
-
-int CPUPerformanceInterface::cpu_load(int which_logical_cpu, double* cpu_load) const {
-  return _impl->cpu_load(which_logical_cpu, cpu_load);
-}
-
-int CPUPerformanceInterface::cpu_load_total_process(double* cpu_load) const {
-  return _impl->cpu_load_total_process(cpu_load);
-}
-
-int CPUPerformanceInterface::cpu_loads_process(double* pjvmUserLoad, double* pjvmKernelLoad, double* psystemTotalLoad) const {
-  return _impl->cpu_loads_process(pjvmUserLoad, pjvmKernelLoad, psystemTotalLoad);
-}
-
-int CPUPerformanceInterface::context_switch_rate(double* rate) const {
-  return _impl->context_switch_rate(rate);
-}
-
-class SystemProcessInterface::SystemProcesses : public CHeapObj<mtInternal> {
-  friend class SystemProcessInterface;
- private:
-  SystemProcesses();
-  bool initialize();
-  NONCOPYABLE(SystemProcesses);
-  ~SystemProcesses();
-
-  //information about system processes
-  int system_processes(SystemProcess** system_processes, int* no_of_sys_processes) const;
-};
-
-SystemProcessInterface::SystemProcesses::SystemProcesses() {
-}
-
-bool SystemProcessInterface::SystemProcesses::initialize() {
-  return true;
-}
-
-SystemProcessInterface::SystemProcesses::~SystemProcesses() {
-}
-int SystemProcessInterface::SystemProcesses::system_processes(SystemProcess** system_processes, int* no_of_sys_processes) const {
-  assert(system_processes != nullptr, "system_processes pointer is null!");
-  assert(no_of_sys_processes != nullptr, "system_processes counter pointer is null!");
-#ifdef __APPLE__
-  pid_t* pids = nullptr;
-  int pid_count = 0;
-  ResourceMark rm;
-
-  int try_count = 0;
-  while (pids == nullptr) {
-    // Find out buffer size
-    size_t pids_bytes = proc_listpids(PROC_ALL_PIDS, 0, nullptr, 0);
-    if (pids_bytes <= 0) {
-      return OS_ERR;
-    }
-    pid_count = pids_bytes / sizeof(pid_t);
-    pids = NEW_RESOURCE_ARRAY(pid_t, pid_count);
-    memset(pids, 0, pids_bytes);
-
-    pids_bytes = proc_listpids(PROC_ALL_PIDS, 0, pids, pids_bytes);
-    if (pids_bytes <= 0) {
-       // couldn't fit buffer, retry.
-      FREE_RESOURCE_ARRAY(pids, pid_count);
-      pids = nullptr;
-      try_count++;
-      if (try_count > 3) {
-      return OS_ERR;
-      }
-    } else {
-      pid_count = pids_bytes / sizeof(pid_t);
-    }
-  }
-
-  int process_count = 0;
-  SystemProcess* next = nullptr;
-  for (int i = 0; i < pid_count; i++) {
-    pid_t pid = pids[i];
-    if (pid != 0) {
-      char buffer[PROC_PIDPATHINFO_MAXSIZE];
-      memset(buffer, 0 , sizeof(buffer));
-      if (proc_pidpath(pid, buffer, sizeof(buffer)) != -1) {
-        int length = strlen(buffer);
-        if (length > 0) {
-          SystemProcess* current = new SystemProcess();
-          char * path = NEW_C_HEAP_ARRAY(char, length + 1, mtInternal);
-          strcpy(path, buffer);
-          current->set_path(path);
-          current->set_pid((int)pid);
-          current->set_next(next);
-          next = current;
-          process_count++;
-        }
-      }
-    }
-  }
-
-  *no_of_sys_processes = process_count;
-  *system_processes = next;
-
-  return OS_OK;
-#elif defined(__FreeBSD__)
-  struct kinfo_proc *lproc;
-  int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC };
-  const u_int miblen = sizeof(mib) / sizeof(mib[0]);
-  size_t length;
-  int pid_count;
-
-  if (sysctl(mib, miblen, nullptr, &length, nullptr, 0) == -1) {
-    return OS_ERR;
-  }
-
-  lproc = NEW_C_HEAP_ARRAY_RETURN_NULL(struct kinfo_proc, length, mtInternal);
-  if (lproc == nullptr) {
-    return OS_ERR;
-  }
-
-  if (sysctl(mib, miblen, lproc, &length, nullptr, 0) == -1) {
-    FREE_C_HEAP_ARRAY(lproc);
-    return OS_ERR;
-  }
-
-  pid_count = length / sizeof(*lproc);
-  int process_count = 0;
-  SystemProcess *next = nullptr;
-
-  for (int i = 0; i < pid_count; i++) {
-    // Executable path
-    int pmib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, lproc[i].ki_pid };
-    const u_int pmiblen = sizeof(pmib) / sizeof(pmib[0]);
-    char pbuf[PATH_MAX];
-    size_t plen = sizeof(pbuf);
-    if (sysctl(pmib, pmiblen, pbuf, &plen, nullptr, 0) == -1) {
-      continue;
-    }
-    plen = strnlen(pbuf, PATH_MAX);
-    if (plen == 0) {
-      continue;
-    }
-    char *path = NEW_C_HEAP_ARRAY_RETURN_NULL(char, plen + 1, mtInternal);
-    if (path == nullptr) {
-      continue;
-    }
-    strlcpy(path, pbuf, plen + 1);
-
-    // Command line
-    int amib[] = { CTL_KERN, KERN_PROC, KERN_PROC_ARGS, lproc[i].ki_pid };
-    const u_int amiblen = sizeof(amib) / sizeof(amib[0]);
-    char abuf[ARG_MAX];
-    size_t alen = sizeof(abuf);
-    char *cmdline = nullptr;
-    if (sysctl(amib, amiblen, abuf, &alen, nullptr, 0) != -1 && alen > 0) {
-      // Arguments are NUL separated in the result, replace that with a space
-      for (size_t j = 0; j < alen; j++) {
-        if (abuf[j] == '\0') {
-          abuf[j] = ' ';
-        }
-      }
-      cmdline = NEW_C_HEAP_ARRAY_RETURN_NULL(char, alen + 1, mtInternal);
-      if (cmdline != nullptr) {
-        strlcpy(cmdline, abuf, alen + 1);
-      }
-    }
-
-    SystemProcess* current = new SystemProcess();
-    current->set_pid((int)lproc[i].ki_pid);
-    current->set_path(path);
-    current->set_command_line(cmdline);
-    current->set_next(next);
-    next = current;
-    process_count++;
-  }
-
-  FREE_C_HEAP_ARRAY(lproc);
-  *no_of_sys_processes = process_count;
-  *system_processes = next;
-
-  return OS_OK;
-#elif defined(__OpenBSD__)
-  struct kinfo_proc *lproc;
-  int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0, sizeof(struct kinfo_proc), 0 };
-  const u_int miblen = sizeof(mib) / sizeof(mib[0]);
-  size_t length;
-  int pid_count, ret = OS_OK;
-
-  if (sysctl(mib, miblen, nullptr, &length, nullptr, 0) == -1) {
-    return OS_ERR;
-  }
-
-  lproc = NEW_C_HEAP_ARRAY_RETURN_NULL(struct kinfo_proc, length, mtInternal);
-  if (lproc == nullptr) {
-    return OS_ERR;
-  }
-
-  mib[5] = length / sizeof(struct kinfo_proc);
-
-  if (sysctl(mib, miblen, lproc, &length, nullptr, 0) == -1) {
-    FREE_C_HEAP_ARRAY(lproc);
-    return OS_ERR;
-  }
-
-  pid_count = length / sizeof(*lproc);
-  int process_count = 0;
-  SystemProcess *next = nullptr;
-
-  for (int i = 0; i < pid_count; i++) {
-    int pmib[] = { CTL_KERN, KERN_PROC_ARGS, lproc[i].p_pid, KERN_PROC_ARGV };
-    const u_int pmiblen = sizeof(pmib) / sizeof(pmib[0]);
-    size_t slen;
-
-    if (sysctl(pmib, pmiblen, nullptr, &length, nullptr, 0) == -1) {
-      ret = OS_ERR;
-      break;
-    }
-
-    // Allocate space for args and get the arguments
-    char **argv = NEW_C_HEAP_ARRAY_RETURN_NULL(char*, length, mtInternal);
-    if (argv == nullptr) {
-      ret = OS_ERR;
-      break;
-    }
-
-    if (sysctl(pmib, pmiblen, argv, &length, nullptr, 0) == -1) {
-      ret = OS_ERR;
-      FREE_C_HEAP_ARRAY(argv);
-      break;
-    }
-
-    if (argv[0] == nullptr) {
-      FREE_C_HEAP_ARRAY(argv);
-      continue;
-    }
-
-    slen = strnlen(argv[0], length);
-    if (slen > 0) {
-      SystemProcess* current = new SystemProcess();
-      char * path = NEW_C_HEAP_ARRAY(char, slen + 1, mtInternal);
-      strlcpy(path, argv[0], slen + 1);
-      current->set_path(path);
-      current->set_pid((int)lproc[i].p_pid);
-      /* TODO: build concatenated string for current->set_command_line() */
-      current->set_next(next);
-      next = current;
-      process_count++;
-    }
-
-    FREE_C_HEAP_ARRAY(argv);
-  }
-
-  FREE_C_HEAP_ARRAY(lproc);
-
-  if (ret != OS_OK) {
-    SystemProcess* current = next;
-    while (current) {
-      next = current->next();
-      delete current; /* ~SystemProcess frees internal strings */
-      current = next;
-    }
-    return ret;
-  }
-
-  *no_of_sys_processes = process_count;
-  *system_processes = next;
-
-  return OS_OK;
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
+#define KINFO_PROC_TYPE struct kinfo_proc
+#define KERN_PROC2 KERN_PROC
 #elif defined(__NetBSD__)
-  struct kinfo_proc2 *lproc;
-  int mib[] = { CTL_KERN, KERN_PROC2, KERN_PROC_ALL, 0, sizeof(struct kinfo_proc2), 0 };
+#define KINFO_PROC_TYPE struct kinfo_proc2
+#endif
+
+#if defined(__FreeBSD__)
+#define KINFO_PROC_PID(ki) ki.ki_pid
+#elif defined(__OpenBSD__) || defined(__NetBSD__)
+#define KINFO_PROC_PID(ki) ki.p_pid
+#endif
+
+size_t proc_listpids(int flag, int unused, pid_t * pids, size_t pids_bytes) {
+  KINFO_PROC_TYPE *lproc;
+  int mib[] = { CTL_KERN, KERN_PROC2, KERN_PROC_ALL,
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+    0, sizeof(*lproc), 0
+#endif
+  };
+
   const u_int miblen = sizeof(mib) / sizeof(mib[0]);
-  size_t length;
-  int pid_count;
+  size_t length = pids_bytes;
 
   if (sysctl(mib, miblen, nullptr, &length, nullptr, 0) == -1) {
-    return OS_ERR;
+    return 0;
   }
 
-  lproc = NEW_C_HEAP_ARRAY_RETURN_NULL(struct kinfo_proc2, length, mtInternal);
-  if (lproc == nullptr) {
-    return OS_ERR;
-  }
+  if (pids != nullptr) {
+    lproc = NEW_C_HEAP_ARRAY_RETURN_NULL(KINFO_PROC_TYPE, length, mtInternal);
+    if (lproc == nullptr) {
+      return 0;
+    }
 
-  mib[5] = length / sizeof(struct kinfo_proc2);
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+    mib[5] = length / sizeof(*lproc);
+#endif
 
-  if (sysctl(mib, miblen, lproc, &length, nullptr, 0) == -1) {
+    if (sysctl(mib, miblen, lproc, &length, nullptr, 0) == -1) {
+      FREE_C_HEAP_ARRAY(lproc);
+      return 0;
+    }
+
+    int pid_count = length / sizeof(*lproc);
+    for (int i = 0; i < pid_count; i++) {
+      pids[i] = KINFO_PROC_PID(lproc[i]);
+    }
+
     FREE_C_HEAP_ARRAY(lproc);
-    return OS_ERR;
   }
 
-  pid_count = length / sizeof(*lproc);
-  int process_count = 0;
-  SystemProcess *next = nullptr;
-
-  for (int i = 0; i < pid_count; i++) {
-    // Executable path
-    int pmib[] = { CTL_KERN, KERN_PROC_ARGS, lproc[i].p_pid, KERN_PROC_PATHNAME };
-    const u_int pmiblen = sizeof(pmib) / sizeof(pmib[0]);
-    char pbuf[PATH_MAX];
-    size_t plen = sizeof(pbuf);
-    if (sysctl(pmib, pmiblen, pbuf, &plen, nullptr, 0) == -1) {
-      continue;
-    }
-    plen = strnlen(pbuf, PATH_MAX);
-    if (plen == 0) {
-      continue;
-    }
-    char *path = NEW_C_HEAP_ARRAY_RETURN_NULL(char, plen + 1, mtInternal);
-    if (path == nullptr) {
-      continue;
-    }
-    strlcpy(path, pbuf, plen + 1);
-
-    // Command line
-    int amib[] = { CTL_KERN, KERN_PROC_ARGS, lproc[i].p_pid, KERN_PROC_ARGV };
-    const u_int amiblen = sizeof(amib) / sizeof(amib[0]);
-    char abuf[ARG_MAX];
-    size_t alen = sizeof(abuf);
-    char *cmdline = nullptr;
-    if (sysctl(amib, amiblen, abuf, &alen, nullptr, 0) != -1 && alen > 0) {
-      // Arguments are NUL separated in the result, replace that with a space
-      for (size_t j = 0; j < alen; j++) {
-        if (abuf[j] == '\0') {
-          abuf[j] = ' ';
-        }
-      }
-      cmdline = NEW_C_HEAP_ARRAY_RETURN_NULL(char, alen + 1, mtInternal);
-      if (cmdline != nullptr) {
-        strlcpy(cmdline, abuf, alen + 1);
-      }
-    }
-
-    SystemProcess* current = new SystemProcess();
-    current->set_pid((int)lproc[i].p_pid);
-    current->set_path(path);
-    current->set_command_line(cmdline);
-    current->set_next(next);
-    next = current;
-    process_count++;
-  }
-
-  FREE_C_HEAP_ARRAY(lproc);
-  *no_of_sys_processes = process_count;
-  *system_processes = next;
-
-  return OS_OK;
-#else
-  return FUNCTIONALITY_NOT_IMPLEMENTED;
-#endif
+  return length;
 }
 
-int SystemProcessInterface::system_processes(SystemProcess** system_procs, int* no_of_sys_processes) const {
-  return _impl->system_processes(system_procs, no_of_sys_processes);
-}
-
-SystemProcessInterface::SystemProcessInterface() {
-  _impl = nullptr;
-}
-
-bool SystemProcessInterface::initialize() {
-  _impl = new SystemProcessInterface::SystemProcesses();
-  return _impl->initialize();
-}
-
-SystemProcessInterface::~SystemProcessInterface() {
-  if (_impl != nullptr) {
-    delete _impl;
- }
-}
-
-CPUInformationInterface::CPUInformationInterface() {
-  _cpu_info = nullptr;
-}
-
-bool CPUInformationInterface::initialize() {
-  _cpu_info = new CPUInformation();
-  VM_Version::initialize_cpu_information();
-  _cpu_info->set_number_of_hardware_threads(VM_Version::number_of_threads());
-  _cpu_info->set_number_of_cores(VM_Version::number_of_cores());
-  _cpu_info->set_number_of_sockets(VM_Version::number_of_sockets());
-  _cpu_info->set_cpu_name(VM_Version::cpu_name());
-  _cpu_info->set_cpu_description(VM_Version::cpu_description());
-  return true;
-}
-
-CPUInformationInterface::~CPUInformationInterface() {
-  if (_cpu_info != nullptr) {
-    if (_cpu_info->cpu_name() != nullptr) {
-      const char* cpu_name = _cpu_info->cpu_name();
-      FREE_C_HEAP_ARRAY(cpu_name);
-      _cpu_info->set_cpu_name(nullptr);
-    }
-    if (_cpu_info->cpu_description() != nullptr) {
-      const char* cpu_desc = _cpu_info->cpu_description();
-      FREE_C_HEAP_ARRAY(cpu_desc);
-      _cpu_info->set_cpu_description(nullptr);
-    }
-    delete _cpu_info;
-  }
-}
-
-int CPUInformationInterface::cpu_information(CPUInformation& cpu_info) {
-  if (nullptr == _cpu_info) {
-    return OS_ERR;
-  }
-
-  cpu_info = *_cpu_info; // shallow copy assignment
-  return OS_OK;
-}
-
-class NetworkPerformanceInterface::NetworkPerformance : public CHeapObj<mtInternal> {
-  friend class NetworkPerformanceInterface;
- private:
-  NetworkPerformance();
-  NONCOPYABLE(NetworkPerformance);
-  bool initialize();
-  ~NetworkPerformance();
-  int network_utilization(NetworkInterface** network_interfaces) const;
-};
-
-NetworkPerformanceInterface::NetworkPerformance::NetworkPerformance() {
-}
-
-bool NetworkPerformanceInterface::NetworkPerformance::initialize() {
-  return true;
-}
-
-NetworkPerformanceInterface::NetworkPerformance::~NetworkPerformance() {
-}
-
-int NetworkPerformanceInterface::NetworkPerformance::network_utilization(NetworkInterface** network_interfaces) const {
-  size_t len;
-  int mib[] = {CTL_NET, PF_ROUTE, /* protocol number */ 0, /* address family */ 0, NET_RT_IFLIST2, /* NET_RT_FLAGS mask*/ 0};
-  if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), nullptr, &len, nullptr, 0) != 0) {
-    return OS_ERR;
-  }
-  uint8_t* buf = NEW_RESOURCE_ARRAY(uint8_t, len);
-  if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), buf, &len, nullptr, 0) != 0) {
-    return OS_ERR;
-  }
-
-  size_t index = 0;
-  NetworkInterface* ret = nullptr;
-  while (index < len) {
-    if_msghdr* msghdr = reinterpret_cast<if_msghdr*>(buf + index);
-    index += msghdr->ifm_msglen;
-
-    if (msghdr->ifm_type != RTM_IFINFO2) {
-      continue;
-    }
-
-#if defined(__APPLE__)
-    if_msghdr2* msghdr2 = reinterpret_cast<if_msghdr2*>(msghdr);
-    sockaddr_dl* sockaddr = reinterpret_cast<sockaddr_dl*>(msghdr2 + 1);
-#else
-    sockaddr_dl* sockaddr = reinterpret_cast<sockaddr_dl*>(msghdr + 1);
+#if defined(__NetBSD__) && !defined(KERN_PROC_PATHNAME)
+#define KERN_PROC_PATHNAME 5
 #endif
 
-    // The interface name is not necessarily NUL-terminated
-    char name_buf[128];
-    size_t name_len = MIN2(sizeof(name_buf) - 1, static_cast<size_t>(sockaddr->sdl_nlen));
-    strlcpy(name_buf, sockaddr->sdl_data, name_len + 1);
+int proc_pidpath(pid_t pid, char * pbuf, size_t plen) {
+#if defined(__FreeBSD__)
+  int pmib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, pid };
+  const u_int pmiblen = sizeof(pmib) / sizeof(pmib[0]);
+  if (sysctl(pmib, pmiblen, pbuf, &plen, nullptr, 0) == -1) {
+    return -1;
+  }
+#elif defined(__OpenBSD__)
+  int pmib[] = { CTL_KERN, KERN_PROC_ARGS, pid, KERN_PROC_ARGV };
+  const u_int pmiblen = sizeof(pmib) / sizeof(pmib[0]);
+  size_t length;
 
-#if defined(__APPLE__)
-    uint64_t bytes_in = msghdr2->ifm_data.ifi_ibytes;
-    uint64_t bytes_out = msghdr2->ifm_data.ifi_obytes;
-#else
-    uint64_t bytes_in = msghdr->ifm_data.ifi_ibytes;
-    uint64_t bytes_out = msghdr->ifm_data.ifi_obytes;
+  if (sysctl(pmib, pmiblen, nullptr, &length, nullptr, 0) == -1) {
+    return -1;
+  }
+
+  // Allocate space for args and get the arguments
+  char **argv = NEW_C_HEAP_ARRAY_RETURN_NULL(char*, length, mtInternal);
+  if (argv == nullptr) {
+    return -1;
+  }
+
+  if (sysctl(pmib, pmiblen, argv, &length, nullptr, 0) == -1) {
+    FREE_C_HEAP_ARRAY(argv);
+    return -1;
+  }
+
+  if (argv[0] == nullptr) {
+    FREE_C_HEAP_ARRAY(argv);
+    return -1;
+  }
+
+  strlcpy(pbuf, argv[0], plen);
+
+#elif defined(__NetBSD__)
+  int pmib[] = { CTL_KERN, KERN_PROC_ARGS, pid, KERN_PROC_PATHNAME };
+  const u_int pmiblen = sizeof(pmib) / sizeof(pmib[0]);
+  if (sysctl(pmib, pmiblen, pbuf, &plen, nullptr, 0) == -1) {
+    return -1;
+  }
 #endif
 
-    NetworkInterface* cur = new NetworkInterface(name_buf, bytes_in, bytes_out, ret);
-    ret = cur;
-  }
-
-  *network_interfaces = ret;
-
-  return OS_OK;
-}
-
-NetworkPerformanceInterface::NetworkPerformanceInterface() {
-  _impl = nullptr;
-}
-
-NetworkPerformanceInterface::~NetworkPerformanceInterface() {
-  if (_impl != nullptr) {
-    delete _impl;
-  }
-}
-
-bool NetworkPerformanceInterface::initialize() {
-  _impl = new NetworkPerformanceInterface::NetworkPerformance();
-  return _impl->initialize();
-}
-
-int NetworkPerformanceInterface::network_utilization(NetworkInterface** network_interfaces) const {
-  return _impl->network_utilization(network_interfaces);
+  return 0;
 }

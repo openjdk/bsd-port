@@ -76,7 +76,9 @@ ifeq ($(call isTargetOs, linux), true)
   endif
 
 else ifeq ($(call isTargetOs, macosx), true)
-  JVM_EXCLUDE_FILES += decoder_bsd.cpp
+  JVM_EXCLUDE_FILES += \
+      decoder_bsd.cpp \
+      os_perf_bsd.cpp
   # The copied fdlibm routines in these files must not be optimized
   BUILD_LIBJVM_sharedRuntimeTrig.cpp_CXXFLAGS := $(FDLIBM_CFLAGS) $(LIBJVM_FDLIBM_COPY_OPT_FLAG)
   BUILD_LIBJVM_sharedRuntimeTrans.cpp_CXXFLAGS := $(FDLIBM_CFLAGS) $(LIBJVM_FDLIBM_COPY_OPT_FLAG)
@@ -138,7 +140,10 @@ else ifeq ($(call isTargetOs, windows), true)
       #
 
 else ifeq ($(call isTargetOs, bsd), true)
-  JVM_EXCLUDE_FILES += decoder_mach0.cpp
+  JVM_EXCLUDE_FILES += \
+      decoder_mach0.cpp \
+      os_perf_macos.cpp
+
   BUILD_LIBJVM_sharedRuntimeTrig.cpp_CXXFLAGS := -DNO_PCH $(FDLIBM_CFLAGS) $(LIBJVM_FDLIBM_COPY_OPT_FLAG)
   BUILD_LIBJVM_sharedRuntimeTrans.cpp_CXXFLAGS := -DNO_PCH $(FDLIBM_CFLAGS) $(LIBJVM_FDLIBM_COPY_OPT_FLAG)
 
