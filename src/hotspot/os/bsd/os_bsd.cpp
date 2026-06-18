@@ -298,7 +298,7 @@ size_t os::rss() {
   u_int namelen = 4;
   int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, pid};
 #endif
-  if (sysctl(mib, namelen, &kp, &bufSize, NULL, 0) != -1) {
+  if (sysctl(mib, namelen, &kp, &bufSize, nullptr, 0) != -1) {
     return kp.KI_RSS * getpagesize();
   }
 #endif // __APPLE__
