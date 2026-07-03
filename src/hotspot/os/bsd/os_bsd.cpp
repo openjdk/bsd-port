@@ -290,14 +290,14 @@ size_t os::rss() {
 #else
   pid_t pid = getpid();
   struct KINFO_PROC_T kp;
-  size_t bufSize = sizeof kp;
-#ifndef __FreeBSD__
-  u_int namelen = 6;
-  int mib[6] = {CTL_KERN, KERN_PROC_MIB, KERN_PROC_PID, pid, bufSize, 1};
-#else
-  u_int namelen = 4;
-  int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, pid};
-#endif
+  size_t bufSize = sizeof(kp);
+  int mib[] = {CTL_KERN, KERN_PROC_MIB, KERN_PROC_PID, pid,
+# ifndef __FreeBSD__
+               static_cast<int>(bufSize), 1
+# endif
+  };
+  const u_int namelen = sizeof(mib)/sizeof(mib[0]);
+
   if (sysctl(mib, namelen, &kp, &bufSize, nullptr, 0) != -1) {
     return kp.KI_RSS * getpagesize();
   }
