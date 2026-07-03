@@ -276,6 +276,18 @@ physical_memory_size_type os::Machine::physical_memory() {
   return Bsd::physical_memory();
 }
 
+static int bsd_get_procinfo(struct KINFO_PROC_T *kp, size_t *bufSize) {
+  pid_t pid = getpid();
+  int mib[] = {CTL_KERN, KERN_PROC_MIB, KERN_PROC_PID, pid,
+# if !defined(__FreeBSD__) && !defined(__APPLE__)
+               static_cast<int>(bufSize), 1
+# endif
+  };
+  const u_int namelen = sizeof(mib)/sizeof(mib[0]);
+
+  return sysctl(mib, namelen, kp, bufSize, nullptr, 0);
+}
+
 size_t os::rss() {
   size_t rss = 0;
 #ifdef __APPLE__
@@ -288,18 +300,11 @@ size_t os::rss() {
     rss = info.resident_size;
   }
 #else
-  pid_t pid = getpid();
   struct KINFO_PROC_T kp;
   size_t bufSize = sizeof(kp);
-  int mib[] = {CTL_KERN, KERN_PROC_MIB, KERN_PROC_PID, pid,
-# ifndef __FreeBSD__
-               static_cast<int>(bufSize), 1
-# endif
-  };
-  const u_int namelen = sizeof(mib)/sizeof(mib[0]);
 
-  if (sysctl(mib, namelen, &kp, &bufSize, nullptr, 0) != -1) {
-    return kp.KI_RSS * getpagesize();
+  if (bsd_get_procinfo(&kp, &bufSize) != -1) {
+    rss = kp.KI_RSS * getpagesize();
   }
 #endif // __APPLE__
 
@@ -940,16 +945,9 @@ pid_t os::Bsd::gettid() {
 // Returns the uid of a process or -1 on error.
 uid_t os::Bsd::get_process_uid(pid_t pid) {
   struct KINFO_PROC_T kp;
-  size_t size = sizeof kp;
-#if defined(__FreeBSD__) || defined(__APPLE__)
-  u_int namelen = 4;
-  int mib_kern[4] = {CTL_KERN, KERN_PROC_MIB, KERN_PROC_PID, pid};
-#else
-  u_int namelen = 6;
-  int mib_kern[6] = {CTL_KERN, KERN_PROC_MIB, KERN_PROC_PID, pid,
-                static_cast<int>(size), 1};
-#endif
-  if (sysctl(mib_kern, namelen, &kp, &size, nullptr, 0) == 0) {
+  size_t size = sizeof(kp);
+
+  if (bsd_get_procinfo(&kp, &size) == 0) {
     if (size > 0 && kp.KI_PID == pid) {
       return kp.KI_UID;
     }
