@@ -873,9 +873,7 @@ void os::javaTimeNanos_info(jvmtiTimerInfo *info_ptr) {
 
 // Information of current thread in variety of formats
 pid_t os::Bsd::gettid() {
-  int retval = -1;
-
-#ifdef __APPLE__ // XNU kernel
+#if defined(__APPLE__) // XNU kernel
   mach_port_t port = mach_thread_self();
   guarantee(MACH_PORT_VALID(port), "just checking");
   mach_port_deallocate(mach_task_self(), port);
@@ -884,17 +882,12 @@ pid_t os::Bsd::gettid() {
 #elif defined(__FreeBSD__)
   return ::pthread_getthreadid_np();
 #elif defined(__OpenBSD__)
-  retval = getthrid();
+  return getthrid();
 #elif defined(__NetBSD__)
-  retval = (pid_t) _lwp_self();
+  return (pid_t) _lwp_self();
 #else
 #error "unsupported OS"
 #endif
-
-  if (retval == -1) {
-    return getpid();
-  }
-  return retval;
 }
 
 // Returns the uid of a process or -1 on error.
