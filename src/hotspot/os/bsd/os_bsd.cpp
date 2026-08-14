@@ -1001,8 +1001,24 @@ static int local_dladdr(const void* addr, Dl_info* info) {
     // value should not be allowed to work to avoid confusion.
     return 0;
   }
-#endif
   return dladdr(addr, info);
+#else
+  int ret = dladdr(addr, info);
+  if (ret == 0)
+    return ret;
+  // On BSD dladdr(3) returns the nearest run-time symbol with an
+  // address less than or equal to addr, whereas on linux it only
+  // returns a symbol if the addr >= the symbol address AND <
+  // the symbol address + symbol size. Since the jvm wants more
+  // accurate symbol resolution, only return symbols that are
+  // an exact match so that Decoder::decode can be called as a fallback.
+  if (info->dli_saddr != nullptr && info->dli_sname != nullptr &&
+      addr != info->dli_saddr) {
+    info->dli_saddr = nullptr;
+    info->dli_sname = nullptr;
+  }
+  return ret;
+#endif
 }
 
 // This must be hard coded because it's the system's temporary
@@ -2283,7 +2299,7 @@ void os::set_native_thread_name(const char *name) {
 bool os::find(address addr, outputStream* st) {
   Dl_info dlinfo;
   memset(&dlinfo, 0, sizeof(dlinfo));
-  if (dladdr(addr, &dlinfo) != 0) {
+  if (local_dladdr(addr, &dlinfo) != 0) {
     st->print(INTPTR_FORMAT ": ", (intptr_t)addr);
     if (dlinfo.dli_sname != nullptr && dlinfo.dli_saddr != nullptr) {
       st->print("%s+%#x", dlinfo.dli_sname,
@@ -2309,7 +2325,7 @@ bool os::find(address addr, outputStream* st) {
       if (!lowest)  lowest = (address) dlinfo.dli_fbase;
       if (begin < lowest)  begin = lowest;
       Dl_info dlinfo2;
-      if (dladdr(end, &dlinfo2) != 0 && dlinfo2.dli_saddr != dlinfo.dli_saddr
+      if (local_dladdr(end, &dlinfo2) != 0 && dlinfo2.dli_saddr != dlinfo.dli_saddr
           && end > dlinfo2.dli_saddr && dlinfo2.dli_saddr > begin) {
         end = (address) dlinfo2.dli_saddr;
       }
