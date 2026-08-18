@@ -138,7 +138,7 @@ else ifeq ($(call isTargetOs, windows), true)
       #
 
 else ifeq ($(call isTargetOs, bsd), true)
-  JVM_EXCLUDE_FILES += decoder_mach0.cpp
+  JVM_EXCLUDE_FILES += decoder_machO.cpp
   BUILD_LIBJVM_sharedRuntimeTrig.cpp_CXXFLAGS := -DNO_PCH $(FDLIBM_CFLAGS) $(LIBJVM_FDLIBM_COPY_OPT_FLAG)
   BUILD_LIBJVM_sharedRuntimeTrans.cpp_CXXFLAGS := -DNO_PCH $(FDLIBM_CFLAGS) $(LIBJVM_FDLIBM_COPY_OPT_FLAG)
 
