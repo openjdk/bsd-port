@@ -1950,6 +1950,35 @@ size_t os::vm_min_address() {
 #endif
 }
 
+#ifdef __OpenBSD__
+// OpenBSD does not provide sleep functionality with nanosecond resolution, so we
+// try to approximate this with spinning combined with spin pause for sleeps
+// less then 20 ms
+void os::naked_short_nanosleep(jlong ns) {
+  assert(ns > -1 && ns < NANOUNITS, "Un-interruptable sleep, short time use only");
+
+  // if >= 20 ms use nanosleep
+  if (ns >= 20 * NANOUNITS_PER_MILLIUNIT) {
+    struct timespec req, rem;
+    req.tv_sec = 0;
+    req.tv_nsec = ns;
+    while(::nanosleep(&req, &rem) == -1) {
+      if (errno == EINTR)
+        req = rem;
+      else
+        break;
+    }
+    return;
+  }
+
+  // less then 20 ms need to use busy wait
+  int64_t start = os::javaTimeNanos();
+  do {
+      SpinPause();
+  } while (os::javaTimeNanos() - start < ns);
+}
+#endif // __OpenBSD__
+
 ////////////////////////////////////////////////////////////////////////////////
 // thread priority support
 
