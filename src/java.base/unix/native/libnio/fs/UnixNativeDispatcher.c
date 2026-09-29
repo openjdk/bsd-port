@@ -1439,8 +1439,10 @@ Java_sun_nio_fs_UnixNativeDispatcher_fgetxattr0(JNIEnv* env, jclass clazz,
     jint fd, jlong nameAddress, jlong valueAddress, jint valueLen)
 {
     ssize_t res = -1;
+#ifndef __OpenBSD__
     const char* name = jlong_to_ptr(nameAddress);
     void* value = jlong_to_ptr(valueAddress);
+#endif
 
 #ifdef __linux__
     res = fgetxattr(fd, name, value, valueLen);
@@ -1464,8 +1466,10 @@ Java_sun_nio_fs_UnixNativeDispatcher_fsetxattr0(JNIEnv* env, jclass clazz,
     jint fd, jlong nameAddress, jlong valueAddress, jint valueLen)
 {
     int res = -1;
+#ifndef __OpenBSD__
     const char* name = jlong_to_ptr(nameAddress);
     void* value = jlong_to_ptr(valueAddress);
+#endif
 
 #ifdef __linux__
     res = fsetxattr(fd, name, value, valueLen, 0);
@@ -1488,7 +1492,9 @@ Java_sun_nio_fs_UnixNativeDispatcher_fremovexattr0(JNIEnv* env, jclass clazz,
     jint fd, jlong nameAddress)
 {
     int res = -1;
+#ifndef __OpenBSD__
     const char* name = jlong_to_ptr(nameAddress);
+#endif
 
 #ifdef __linux__
     res = fremovexattr(fd, name);
@@ -1511,7 +1517,9 @@ Java_sun_nio_fs_UnixNativeDispatcher_flistxattr(JNIEnv* env, jclass clazz,
     jint fd, jlong listAddress, jint size)
 {
     ssize_t res = -1;
+#ifndef __OpenBSD__
     char* list = jlong_to_ptr(listAddress);
+#endif
 
 #ifdef __linux__
     res = flistxattr(fd, list, (size_t)size);
