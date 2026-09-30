@@ -39,7 +39,9 @@ class BsdThread implements ThreadProxy {
         // However, making it so would produce a dependency on the "types"
         // package from the debugger package, which is not desired.
         this.thread_id = (int) threadIdAddr.getCIntegerAt(0, 4, true);
-        this.unique_thread_id = uniqueThreadIdAddr.getCIntegerAt(0, 8, true);
+        if (is_darwin) {
+            this.unique_thread_id = uniqueThreadIdAddr.getCIntegerAt(0, 8, true);
+        }
     }
 
     BsdThread(BsdDebugger debugger, long id) {
