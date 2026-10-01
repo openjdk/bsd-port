@@ -1175,11 +1175,9 @@ public class Socket implements java.io.Closeable {
             if (linger < 0) {
                 throw new IllegalArgumentException("invalid value for SO_LINGER");
             }
-
-            // Clamp linger value to max supported by system
-            var os = System.getProperty("os.name").toLowerCase();
-            var maxLinger = os.endsWith("bsd") ? 32767 : 65535;
-            getImpl().setOption(SocketOptions.SO_LINGER, Math.min(linger, maxLinger));
+            if (linger > 65535)
+                linger = 65535;
+            getImpl().setOption(SocketOptions.SO_LINGER, linger);
         }
     }
 
