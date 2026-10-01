@@ -684,7 +684,7 @@ class Assembler : public AbstractAssembler {
     VMHADDSHS_OPCODE=(4u  << OPCODE_SHIFT |   32u     ),
     VMHRADDSHS_OPCODE=(4u << OPCODE_SHIFT |   33u     ),
     VMLADDUHM_OPCODE=(4u  << OPCODE_SHIFT |   34u     ),
-    VMSUBUHM_OPCODE= (4u  << OPCODE_SHIFT |   36u     ),
+    VMSUMUBM_OPCODE= (4u  << OPCODE_SHIFT |   36u     ),
     VMSUMMBM_OPCODE= (4u  << OPCODE_SHIFT |   37u     ),
     VMSUMSHM_OPCODE= (4u  << OPCODE_SHIFT |   40u     ),
     VMSUMSHS_OPCODE= (4u  << OPCODE_SHIFT |   41u     ),
@@ -1367,10 +1367,6 @@ class Assembler : public AbstractAssembler {
 
   static inline bool is_aligned(unsigned int addr, unsigned int a) {
     return (0 == addr % a);
-  }
-
-  void flush() {
-    AbstractAssembler::flush();
   }
 
   inline void emit_int32(int);  // shadows AbstractAssembler::emit_int32
@@ -2296,7 +2292,7 @@ class Assembler : public AbstractAssembler {
   inline void vmhaddshs(VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
   inline void vmhraddshs(VectorRegister d,VectorRegister a, VectorRegister b, VectorRegister c);
   inline void vmladduhm(VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
-  inline void vmsubuhm( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+  inline void vmsumubm( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
   inline void vmsummbm( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
   inline void vmsumshm( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
   inline void vmsumshs( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
