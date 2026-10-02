@@ -1456,7 +1456,7 @@ Java_sun_nio_fs_UnixNativeDispatcher_fgetxattr0(JNIEnv* env, jclass clazz,
     throwUnixException(env, ENOTSUP);
 #endif
 
-    if (res == (ssize_t)-1)
+    if (res == -1)
         throwUnixException(env, errno);
     return (jint)res;
 }
@@ -1533,7 +1533,7 @@ Java_sun_nio_fs_UnixNativeDispatcher_flistxattr(JNIEnv* env, jclass clazz,
     throwUnixException(env, ENOTSUP);
 #endif
 
-    if (res == (ssize_t)-1)
+    if (res == -1)
         throwUnixException(env, errno);
     return (jint)res;
 }
