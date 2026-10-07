@@ -411,7 +411,10 @@ public class BsdDebuggerLocal extends DebuggerBase implements BsdDebugger {
 
     @Override
     public ThreadProxy getThreadForIdentifierAddress(Address addr) {
-        throw new RuntimeException("unimplemented");
+        if (isDarwin) {
+            throw new RuntimeException("unimplemented");
+        }
+        return new BsdThread(this, addr, null);
     }
 
     /** From the ThreadAccess interface via Debugger and JVMDebugger */
