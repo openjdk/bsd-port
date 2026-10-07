@@ -25,6 +25,7 @@
 package sun.jvm.hotspot.debugger.bsd;
 
 import sun.jvm.hotspot.debugger.*;
+import sun.jvm.hotspot.utilities.PlatformInfo;
 
 class BsdThread implements ThreadProxy {
     private BsdDebugger debugger;
