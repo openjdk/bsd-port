@@ -73,6 +73,10 @@ class BsdThread implements ThreadProxy {
         return Integer.toString(thread_id);
     }
 
+    private static boolean isDarwin() {
+        return PlatformInfo.getOS().equals("darwin");
+    }
+
     public ThreadContext getContext() throws IllegalThreadStateException {
         long[] data = debugger.getThreadIntegerRegisterSet(unique_thread_id);
         ThreadContext context = BsdThreadContextFactory.createThreadContext(debugger);
