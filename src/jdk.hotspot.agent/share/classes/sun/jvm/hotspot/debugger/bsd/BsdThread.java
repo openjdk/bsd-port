@@ -25,27 +25,36 @@
 package sun.jvm.hotspot.debugger.bsd;
 
 import sun.jvm.hotspot.debugger.*;
+import sun.jvm.hotspot.utilities.PlatformInfo;
 
 class BsdThread implements ThreadProxy {
     private BsdDebugger debugger;
     private int         thread_id;
     private long        unique_thread_id;
+    private boolean     is_darwin;
 
     /** The address argument must be the address of the _thread_id in the
         OSThread. It's value is result ::gettid() call. */
     BsdThread(BsdDebugger debugger, Address threadIdAddr, Address uniqueThreadIdAddr) {
+        this.is_darwin = isDarwin();
         this.debugger = debugger;
         // FIXME: size of data fetched here should be configurable.
         // However, making it so would produce a dependency on the "types"
         // package from the debugger package, which is not desired.
         this.thread_id = (int) threadIdAddr.getCIntegerAt(0, 4, true);
-        this.unique_thread_id = uniqueThreadIdAddr.getCIntegerAt(0, 8, true);
+        if (is_darwin) {
+            this.unique_thread_id = uniqueThreadIdAddr.getCIntegerAt(0, 8, true);
+        }
     }
 
     BsdThread(BsdDebugger debugger, long id) {
+        this.is_darwin = isDarwin();
         this.debugger = debugger;
         // use unique_thread_id to identify thread
         this.unique_thread_id = id;
+        if (!is_darwin) {
+            this.thread_id = (int) id;
+        }
     }
 
     public boolean equals(Object obj) {
@@ -53,15 +62,20 @@ class BsdThread implements ThreadProxy {
             return false;
         }
 
-        return (other.unique_thread_id == unique_thread_id);
+        return is_darwin ? (((BsdThread) obj).unique_thread_id == unique_thread_id)
+                         : (((BsdThread) obj).thread_id == thread_id);
     }
 
     public int hashCode() {
-        return thread_id;
+        return is_darwin ? Long.hashCode(unique_thread_id) : thread_id;
     }
 
     public String toString() {
         return Integer.toString(thread_id);
+    }
+
+    private static boolean isDarwin() {
+        return PlatformInfo.getOS().equals("darwin");
     }
 
     public ThreadContext getContext() throws IllegalThreadStateException {

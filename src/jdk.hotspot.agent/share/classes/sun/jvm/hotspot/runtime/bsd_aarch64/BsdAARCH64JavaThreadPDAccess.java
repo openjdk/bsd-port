@@ -31,6 +31,7 @@ import sun.jvm.hotspot.debugger.*;
 import sun.jvm.hotspot.debugger.aarch64.*;
 import sun.jvm.hotspot.debugger.bsd.BsdDebugger;
 import sun.jvm.hotspot.debugger.bsd.BsdDebuggerLocal;
+import sun.jvm.hotspot.debugger.remote.RemoteDebuggerClient;
 import sun.jvm.hotspot.runtime.*;
 import sun.jvm.hotspot.runtime.aarch64.*;
 import sun.jvm.hotspot.types.*;
@@ -131,9 +132,15 @@ public class BsdAARCH64JavaThreadPDAccess implements JavaThreadPDAccess {
     Address osThreadAddr = osThreadField.getValue(addr);
     // Get the address of the _thread_id from the OSThread
     Address threadIdAddr = osThreadAddr.addOffsetTo(osThreadThreadIDField.getOffset());
-    Address uniqueThreadIdAddr = osThreadAddr.addOffsetTo(osThreadUniqueThreadIDField.getOffset());
 
-    BsdDebuggerLocal debugger = (BsdDebuggerLocal) VM.getVM().getDebugger();
-    return debugger.getThreadForIdentifierAddress(threadIdAddr, uniqueThreadIdAddr);
+    JVMDebugger debugger = VM.getVM().getDebugger();
+    if (debugger instanceof RemoteDebuggerClient) {
+      return debugger.getThreadForIdentifierAddress(threadIdAddr);
+    } else {
+      Address uniqueThreadIdAddr = osThreadAddr.addOffsetTo(osThreadUniqueThreadIDField.getOffset());
+
+      BsdDebuggerLocal bsddebugger = (BsdDebuggerLocal) debugger;
+      return bsddebugger.getThreadForIdentifierAddress(threadIdAddr, uniqueThreadIdAddr);
+    }
   }
 }
